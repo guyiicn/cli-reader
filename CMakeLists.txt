@@ -117,5 +117,6 @@ target_link_libraries(${EXECUTABLE_NAME}
 if(STATIC_BUILD)
     target_link_libraries(${EXECUTABLE_NAME} PRIVATE ftxui::screen ftxui::dom ftxui::component mobi)
 else()
-    target_link_libraries(${EXECUTABLE_NAME} PRIVATE ${FTXUI_LIBRARIES} ${MOBI_LIBRARIES})
+    # Be explicit for dynamic builds as well, as ${FTXUI_LIBRARIES} can be inconsistent.
+    target_link_libraries(${EXECUTABLE_NAME} PRIVATE ftxui-screen ftxui-dom ftxui-component ${MOBI_LIBRARIES})
 endif()
