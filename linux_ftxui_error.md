@@ -20,7 +20,7 @@
 
 ## 修复方案
 
-### 1. CMakeLists.txt 修改
+### 1. CMakeLists.txt 修改 - 库链接顺序问题
 
 #### 修改前（有问题的代码）：
 ```cmake
@@ -30,11 +30,39 @@ else()
 endif()
 ```
 
-#### 修改后（修复的代码）：
+#### 第一次修复尝试（仍有问题）：
 ```cmake
 else()
     # Dynamic build: use discovered libraries
     target_link_libraries(${EXECUTABLE_NAME} PRIVATE ${FTXUI_LIBRARIES} ${MOBI_LIBRARIES} ${CURSES_LIBRARIES})
+endif()
+```
+
+#### 最终修复（解决库顺序和目录问题）：
+```cmake
+# 在创建可执行文件之前添加库目录
+if(NOT STATIC_BUILD)
+    if(FTXUI_LIBRARY_DIRS)
+        link_directories(${FTXUI_LIBRARY_DIRS})
+    endif()
+    if(MOBI_LIBRARY_DIRS)
+        link_directories(${MOBI_LIBRARY_DIRS})
+    endif()
+endif()
+
+# ... 创建可执行文件 ...
+
+# 链接库时使用正确的顺序
+else()
+    # Dynamic build: Link libraries with correct order 
+    # FTXUI链接顺序很重要：component -> dom -> screen
+    target_link_libraries(${EXECUTABLE_NAME} PRIVATE 
+        ftxui-component 
+        ftxui-dom 
+        ftxui-screen 
+        ${MOBI_LIBRARIES} 
+        ${CURSES_LIBRARIES}
+    )
     
     # Add compiler flags from pkg-config if available
     if(FTXUI_METHOD STREQUAL "pkg-config")
@@ -43,13 +71,13 @@ else()
     if(MOBI_FOUND)
         target_compile_options(${EXECUTABLE_NAME} PRIVATE ${MOBI_CFLAGS_OTHER})
     endif()
-    
-    message(STATUS "Dynamic build configuration:")
-    message(STATUS "  FTXUI method: ${FTXUI_METHOD}")
-    message(STATUS "  FTXUI libraries: ${FTXUI_LIBRARIES}")
-    message(STATUS "  MOBI libraries: ${MOBI_LIBRARIES}")
 endif()
 ```
+
+**关键修复点：**
+1. **库顺序**：FTXUI必须按照 `component -> dom -> screen` 的顺序链接
+2. **库目录**：使用 `link_directories()` 在创建可执行文件之前添加库搜索路径
+3. **显式库名**：直接使用 `ftxui-component` 等库名，而不是变量
 
 ### 2. 增强的FTXUI查找机制
 
@@ -227,3 +255,47 @@ cmake .. -DCMAKE_VERBOSE_MAKEFILE=ON -DSTATIC_BUILD=OFF
 ```
 
 构建的二进制文件应该能正常运行，不再出现undefined reference错误。
+
+## 更新：最终解决方案（针对库顺序问题）
+
+如果你的系统显示FTXUI已正确安装（如pkg-config检查通过），但仍然出现链接错误，这通常是库链接顺序的问题。
+
+### 问题特征：
+- pkg-config能找到FTXUI：`pkg-config --libs ftxui` 返回 `-lftxui-component -lftxui-dom -lftxui-screen`
+- 编译过程正常，只在最后链接阶段失败
+- 出现大量`undefined reference to ftxui::`错误
+
+### 根本原因：
+FTXUI的三个库之间有依赖关系：
+- `ftxui-component` 依赖 `ftxui-dom`
+- `ftxui-dom` 依赖 `ftxui-screen`
+- 链接顺序必须是：`component -> dom -> screen`
+
+### 现在可以尝试的修复：
+1. **清理之前的构建**：
+```bash
+rm -rf build/
+mkdir build && cd build
+```
+
+2. **重新配置和构建**：
+```bash
+cmake .. -DSTATIC_BUILD=OFF
+make -j$(nproc)
+```
+
+3. **如果仍有问题，手动验证库文件**：
+```bash
+# 检查库文件是否存在
+find /usr -name "*ftxui*" 2>/dev/null
+ldd /usr/lib/x86_64-linux-gnu/libftxui-component.so* 2>/dev/null
+```
+
+### 备用解决方案：
+如果动态链接仍有问题，强烈建议使用静态构建：
+```bash
+cmake .. -DSTATIC_BUILD=ON
+make -j$(nproc)
+```
+
+静态构建会避免所有动态链接的复杂性问题。
