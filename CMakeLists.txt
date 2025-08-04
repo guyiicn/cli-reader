@@ -32,10 +32,51 @@ else()
     # --- Dynamic Dependencies (pkg-config) ---
     find_package(PkgConfig REQUIRED)
     find_package(Curses REQUIRED) # Find ncurses
-    pkg_check_modules(FTXUI REQUIRED ftxui)
-    link_directories(${FTXUI_LIBRARY_DIRS})
+    
+    # Find FTXUI with fallback options
+    pkg_check_modules(FTXUI ftxui)
+    if(FTXUI_FOUND)
+        message(STATUS "FTXUI found via pkg-config")
+        message(STATUS "  FTXUI_LIBRARIES: ${FTXUI_LIBRARIES}")
+        message(STATUS "  FTXUI_LIBRARY_DIRS: ${FTXUI_LIBRARY_DIRS}")
+        message(STATUS "  FTXUI_INCLUDE_DIRS: ${FTXUI_INCLUDE_DIRS}")
+        link_directories(${FTXUI_LIBRARY_DIRS})
+        set(FTXUI_METHOD "pkg-config")
+    else()
+        # Fallback: try to find FTXUI manually
+        message(STATUS "FTXUI not found via pkg-config, trying manual detection...")
+        
+        find_library(FTXUI_SCREEN_LIB NAMES ftxui-screen)
+        find_library(FTXUI_DOM_LIB NAMES ftxui-dom)  
+        find_library(FTXUI_COMPONENT_LIB NAMES ftxui-component)
+        find_path(FTXUI_INCLUDE_PATH ftxui/screen/screen.hpp)
+        
+        if(FTXUI_SCREEN_LIB AND FTXUI_DOM_LIB AND FTXUI_COMPONENT_LIB AND FTXUI_INCLUDE_PATH)
+            message(STATUS "FTXUI found manually")
+            message(STATUS "  Screen lib: ${FTXUI_SCREEN_LIB}")
+            message(STATUS "  DOM lib: ${FTXUI_DOM_LIB}")
+            message(STATUS "  Component lib: ${FTXUI_COMPONENT_LIB}")
+            message(STATUS "  Include path: ${FTXUI_INCLUDE_PATH}")
+            
+            set(FTXUI_LIBRARIES "${FTXUI_COMPONENT_LIB};${FTXUI_DOM_LIB};${FTXUI_SCREEN_LIB}")
+            set(FTXUI_INCLUDE_DIRS "${FTXUI_INCLUDE_PATH}")
+            set(FTXUI_METHOD "manual")
+        else()
+            message(FATAL_ERROR "FTXUI not found. Please install libftxui-dev or build from source.")
+        endif()
+    endif()
+    
+    # Find libmobi with detailed error reporting  
     pkg_check_modules(MOBI REQUIRED libmobi)
-    link_directories(${MOBI_LIBRARY_DIRS})
+    if(MOBI_FOUND)
+        message(STATUS "libmobi found via pkg-config")
+        message(STATUS "  MOBI_LIBRARIES: ${MOBI_LIBRARIES}")
+        message(STATUS "  MOBI_LIBRARY_DIRS: ${MOBI_LIBRARY_DIRS}")
+        message(STATUS "  MOBI_INCLUDE_DIRS: ${MOBI_INCLUDE_DIRS}")
+        link_directories(${MOBI_LIBRARY_DIRS})
+    else()
+        message(FATAL_ERROR "libmobi not found via pkg-config. Install libmobi-dev or similar package.")
+    endif()
 endif()
 
 # --- Common Dependencies (Always fetched) ---
@@ -118,6 +159,19 @@ target_link_libraries(${EXECUTABLE_NAME}
 if(STATIC_BUILD)
     target_link_libraries(${EXECUTABLE_NAME} PRIVATE ftxui::screen ftxui::dom ftxui::component mobi)
 else()
-    # Be explicit for dynamic builds as well, as ${FTXUI_LIBRARIES} can be inconsistent.
-    target_link_libraries(${EXECUTABLE_NAME} PRIVATE ftxui-screen ftxui-dom ftxui-component ${MOBI_LIBRARIES} ${CURSES_LIBRARIES})
+    # Dynamic build: use discovered libraries
+    target_link_libraries(${EXECUTABLE_NAME} PRIVATE ${FTXUI_LIBRARIES} ${MOBI_LIBRARIES} ${CURSES_LIBRARIES})
+    
+    # Add compiler flags from pkg-config if available
+    if(FTXUI_METHOD STREQUAL "pkg-config")
+        target_compile_options(${EXECUTABLE_NAME} PRIVATE ${FTXUI_CFLAGS_OTHER})
+    endif()
+    if(MOBI_FOUND)
+        target_compile_options(${EXECUTABLE_NAME} PRIVATE ${MOBI_CFLAGS_OTHER})
+    endif()
+    
+    message(STATUS "Dynamic build configuration:")
+    message(STATUS "  FTXUI method: ${FTXUI_METHOD}")
+    message(STATUS "  FTXUI libraries: ${FTXUI_LIBRARIES}")
+    message(STATUS "  MOBI libraries: ${MOBI_LIBRARIES}")
 endif()
