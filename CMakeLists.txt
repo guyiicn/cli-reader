@@ -123,6 +123,16 @@ target_include_directories(sqlite3_lib PUBLIC
     ${sqlite3_content_SOURCE_DIR}
 )
 
+# --- Add library directories before creating executable (for dynamic build) ---
+if(NOT STATIC_BUILD)
+    if(FTXUI_LIBRARY_DIRS)
+        link_directories(${FTXUI_LIBRARY_DIRS})
+    endif()
+    if(MOBI_LIBRARY_DIRS)
+        link_directories(${MOBI_LIBRARY_DIRS})
+    endif()
+endif()
+
 # --- Source Files ---
 add_executable(${EXECUTABLE_NAME}
     src/main.cpp
@@ -159,8 +169,15 @@ target_link_libraries(${EXECUTABLE_NAME}
 if(STATIC_BUILD)
     target_link_libraries(${EXECUTABLE_NAME} PRIVATE ftxui::screen ftxui::dom ftxui::component mobi)
 else()
-    # Dynamic build: use discovered libraries
-    target_link_libraries(${EXECUTABLE_NAME} PRIVATE ${FTXUI_LIBRARIES} ${MOBI_LIBRARIES} ${CURSES_LIBRARIES})
+    # Dynamic build: Link libraries with correct order 
+    # FTXUI链接顺序很重要：component -> dom -> screen
+    target_link_libraries(${EXECUTABLE_NAME} PRIVATE 
+        ftxui-component 
+        ftxui-dom 
+        ftxui-screen 
+        ${MOBI_LIBRARIES} 
+        ${CURSES_LIBRARIES}
+    )
     
     # Add compiler flags from pkg-config if available
     if(FTXUI_METHOD STREQUAL "pkg-config")
@@ -174,4 +191,5 @@ else()
     message(STATUS "  FTXUI method: ${FTXUI_METHOD}")
     message(STATUS "  FTXUI libraries: ${FTXUI_LIBRARIES}")
     message(STATUS "  MOBI libraries: ${MOBI_LIBRARIES}")
+    message(STATUS "  Using explicit library names: ftxui-component ftxui-dom ftxui-screen")
 endif()
