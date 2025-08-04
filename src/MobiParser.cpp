@@ -3,6 +3,7 @@
 #include "HtmlRenderer.h"
 #include <mobi.h>
 #include <filesystem>
+#include <functional>
 #include <map>
 #include <vector>
 
