@@ -16,15 +16,37 @@ if(STATIC_BUILD)
     set(EXECUTABLE_NAME "ebook_reader_static")
     set(BUILD_SHARED_LIBS OFF)
 
-    # --- Static Dependencies (FetchContent) ---
-    FetchContent_Declare(ftxui_content GIT_REPOSITORY https://github.com/ArthurSonzogni/FTXUI.git GIT_TAG v5.0.0)
-    set(FTXUI_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-    set(FTXUI_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(ftxui_content)
+    # --- Check for pre-built local dependencies ---
+    if(DEFINED FTXUI_ROOT AND EXISTS "${FTXUI_ROOT}")
+        message(STATUS "Using local FTXUI installation: ${FTXUI_ROOT}")
+        find_package(ftxui REQUIRED PATHS ${FTXUI_ROOT} NO_DEFAULT_PATH)
+        set(FTXUI_LOCAL_BUILD TRUE)
+    else()
+        message(STATUS "Using FetchContent for FTXUI")
+        FetchContent_Declare(ftxui_content GIT_REPOSITORY https://github.com/ArthurSonzogni/FTXUI.git GIT_TAG v5.0.0)
+        set(FTXUI_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+        set(FTXUI_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+        FetchContent_MakeAvailable(ftxui_content)
+        set(FTXUI_LOCAL_BUILD FALSE)
+    endif()
 
-    FetchContent_Declare(libmobi_content GIT_REPOSITORY https://github.com/bfabiszewski/libmobi.git GIT_TAG v0.12)
-    set(BUILD_TOOLS OFF CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(libmobi_content)
+    if(DEFINED LIBMOBI_ROOT AND EXISTS "${LIBMOBI_ROOT}")
+        message(STATUS "Using local libmobi installation: ${LIBMOBI_ROOT}")
+        find_library(MOBI_LIBRARY mobi PATHS ${LIBMOBI_ROOT}/lib NO_DEFAULT_PATH REQUIRED)
+        find_path(MOBI_INCLUDE_DIR mobi.h PATHS ${LIBMOBI_ROOT}/include NO_DEFAULT_PATH REQUIRED)
+        
+        # Find libxml2 for libmobi XML functionality
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(LIBXML2 REQUIRED libxml-2.0)
+        
+        set(LIBMOBI_LOCAL_BUILD TRUE)
+    else()
+        message(STATUS "Using FetchContent for libmobi")
+        FetchContent_Declare(libmobi_content GIT_REPOSITORY https://github.com/bfabiszewski/libmobi.git GIT_TAG v0.12)
+        set(BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+        FetchContent_MakeAvailable(libmobi_content)
+        set(LIBMOBI_LOCAL_BUILD FALSE)
+    endif()
 else()
     message(STATUS "--- Performing a DYNAMIC build ---")
     set(EXECUTABLE_NAME "ebook_reader")
@@ -34,8 +56,9 @@ else()
     find_package(Curses REQUIRED) # Find ncurses
     
     # Find FTXUI with fallback options
-    pkg_check_modules(FTXUI ftxui)
-    if(FTXUI_FOUND)
+    # Skip pkg-config for now due to static library linking issues
+    set(FTXUI_FOUND FALSE)
+    if(FALSE AND FTXUI_FOUND)
         message(STATUS "FTXUI found via pkg-config")
         message(STATUS "  FTXUI_LIBRARIES: ${FTXUI_LIBRARIES}")
         message(STATUS "  FTXUI_LIBRARY_DIRS: ${FTXUI_LIBRARY_DIRS}")
@@ -155,6 +178,11 @@ if(NOT STATIC_BUILD)
         ${MOBI_INCLUDE_DIRS}
         ${FTXUI_INCLUDE_DIRS}
     )
+else()
+    # Static build include directories for local builds
+    if(LIBMOBI_LOCAL_BUILD)
+        target_include_directories(${EXECUTABLE_NAME} PRIVATE ${MOBI_INCLUDE_DIR})
+    endif()
 endif()
 
 # --- Linking Libraries ---
@@ -167,17 +195,46 @@ target_link_libraries(${EXECUTABLE_NAME}
   sqlite3_lib
 )
 if(STATIC_BUILD)
-    target_link_libraries(${EXECUTABLE_NAME} PRIVATE ftxui::screen ftxui::dom ftxui::component mobi)
+    # Static build linking
+    if(FTXUI_LOCAL_BUILD)
+        # Use local pre-built FTXUI
+        target_link_libraries(${EXECUTABLE_NAME} PRIVATE ftxui::screen ftxui::dom ftxui::component)
+    else()
+        # Use FetchContent FTXUI
+        target_link_libraries(${EXECUTABLE_NAME} PRIVATE ftxui::screen ftxui::dom ftxui::component)
+    endif()
+    
+    if(LIBMOBI_LOCAL_BUILD)
+        # Use local pre-built libmobi with libxml2 dependency
+        target_link_libraries(${EXECUTABLE_NAME} PRIVATE ${MOBI_LIBRARY} ${LIBXML2_LIBRARIES})
+        target_link_directories(${EXECUTABLE_NAME} PRIVATE ${LIBXML2_LIBRARY_DIRS})
+        target_compile_options(${EXECUTABLE_NAME} PRIVATE ${LIBXML2_CFLAGS_OTHER})
+    else()
+        # Use FetchContent libmobi
+        target_link_libraries(${EXECUTABLE_NAME} PRIVATE mobi)
+    endif()
 else()
     # Dynamic build: Link libraries with correct order 
     # FTXUI链接顺序很重要：component -> dom -> screen
-    target_link_libraries(${EXECUTABLE_NAME} PRIVATE 
-        ftxui-component 
-        ftxui-dom 
-        ftxui-screen 
-        ${MOBI_LIBRARIES} 
-        ${CURSES_LIBRARIES}
-    )
+    # Use the libraries found by manual detection or pkg-config
+    if(FTXUI_METHOD STREQUAL "manual")
+        target_link_libraries(${EXECUTABLE_NAME} PRIVATE 
+            ${FTXUI_COMPONENT_LIB}
+            ${FTXUI_DOM_LIB}
+            ${FTXUI_SCREEN_LIB}
+            ${MOBI_LIBRARIES} 
+            ${CURSES_LIBRARIES}
+        )
+    else()
+        # pkg-config method - use library names
+        target_link_libraries(${EXECUTABLE_NAME} PRIVATE 
+            ftxui-component 
+            ftxui-dom 
+            ftxui-screen 
+            ${MOBI_LIBRARIES} 
+            ${CURSES_LIBRARIES}
+        )
+    endif()
     
     # Add compiler flags from pkg-config if available
     if(FTXUI_METHOD STREQUAL "pkg-config")
@@ -189,7 +246,8 @@ else()
     
     message(STATUS "Dynamic build configuration:")
     message(STATUS "  FTXUI method: ${FTXUI_METHOD}")
-    message(STATUS "  FTXUI libraries: ${FTXUI_LIBRARIES}")
+    message(STATUS "  FTXUI component lib: ${FTXUI_COMPONENT_LIB}")
+    message(STATUS "  FTXUI dom lib: ${FTXUI_DOM_LIB}")
+    message(STATUS "  FTXUI screen lib: ${FTXUI_SCREEN_LIB}")
     message(STATUS "  MOBI libraries: ${MOBI_LIBRARIES}")
-    message(STATUS "  Using explicit library names: ftxui-component ftxui-dom ftxui-screen")
 endif()

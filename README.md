@@ -1,86 +1,73 @@
-# All Reader - A Command-Line Ebook Reader
+# All Reader - Command-Line Ebook Reader
 
-All Reader is a versatile, cross-platform ebook reader designed for the terminal. It provides a clean, distraction-free reading experience with a focus on performance and usability.
+A versatile, cross-platform ebook reader for the terminal. Supports EPUB, MOBI, AZW3, and TXT files with a clean, distraction-free reading experience.
 
-## Core Features
+## Features
 
-- **Multi-Format Support:** Reads EPUB, MOBI, AZW3, and plain TXT files.
-- **Intelligent Table of Contents:** Automatically extracts real chapter titles from MOBI/AZW3 files and supports nested TOC navigation.
-- **Smart Pagination:** Ensures every chapter begins on a new page for a natural reading flow.
-- **Persistent Library:** Manages your book collection in a local database (`~/.all_reader/`).
-- **Paginated Views:** Both the library and the table of contents are paginated for easy navigation of large collections.
-- **Convenience:** Remembers the last directory you used to add books, simplifying the process of importing new files.
+- **Multi-Format Support**: EPUB, MOBI, AZW3, and TXT files
+- **Smart Navigation**: Automatic table of contents extraction and pagination
+- **Persistent Library**: Local database to manage your book collection
+- **Cross-Platform**: Works on macOS and Linux
 
-## Dependencies
+## Quick Start
 
-To run the pre-compiled binary or to compile the project from source, you will need to have the following libraries installed on your system.
+### Linux (Recommended)
 
-### macOS (via [Homebrew](https://brew.sh/))
+```bash
+# Install basic build tools
+sudo apt install build-essential cmake pkg-config git autotools-dev autoconf libtool libxml2-dev
 
-- **FTXUI:** For the terminal-based user interface.
-- **libmobi:** For parsing MOBI and AZW3 files.
+# One-command build
+./setup_build.sh && ./build_linux_static.sh
+```
 
-### Linux
-
-- **FTXUI:** `libftxui-dev` (Debian/Ubuntu), `ftxui-devel` (Fedora), `ftxui` (Arch AUR).
-- **libmobi:** `libmobi-dev` (Debian/Ubuntu), `libmobi-devel` (Fedora), `libmobi` (Arch).
-- **ncurses:** `libncurses-dev` (Debian/Ubuntu), `ncurses-devel` (Fedora), `ncurses` (Arch).
-
-### Internal Dependencies (Handled Automatically)
-
-The following libraries are also dependencies, but they are managed automatically by CMake's `FetchContent` module. You **do not** need to install them manually.
-
-- **libzip:** For handling EPUB container files.
-- **gumbo-parser:** For parsing HTML content within ebooks.
-- **TinyXML2:** For parsing XML files (e.g., `container.xml` in EPUBs).
-- **SQLite3:** For the book library database.
-
----
-
-## How to Compile (Dynamic Build)
+The executable `ebook_reader_static` will be created in the `build/` directory.
 
 ### macOS
 
-1.  **Install Dependencies:**
-    ```bash
-    brew install cmake pkg-config ftxui libmobi
-    ```
+```bash
+# Install dependencies
+brew install cmake pkg-config ftxui libmobi
 
-2.  **Configure and Compile:**
-    ```bash
-    mkdir build
-    cd build
-    cmake ..
-    make
-    ```
-    The executable `ebook_reader` will be created in the `build` directory.
+# Build
+./setup_build.sh && ./build_macos_dynamic.sh
+```
 
-### Linux
+The executable `ebook_reader` will be created in the `build/` directory.
 
-1.  **Install Dependencies:**
+## Manual Build (Advanced)
 
-    **For Debian/Ubuntu:**
-    ```bash
-    sudo apt update
-    sudo apt install build-essential cmake pkg-config libftxui-dev libmobi-dev libncurses-dev
-    ```
+If you prefer manual control:
 
-    **For Fedora/RHEL/CentOS:**
-    ```bash
-    sudo dnf groupinstall "Development Tools"
-    sudo dnf install cmake pkg-config ftxui-devel libmobi-devel ncurses-devel
-    ```
+```bash
+mkdir build && cd build
+cmake -DSTATIC_BUILD=ON ..  # Linux static build
+# cmake ..                  # macOS dynamic build
+make -j$(nproc)
+```
 
-    **For Arch Linux (using an AUR helper like `yay`):**
-    ```bash
-    yay -S base-devel cmake pkg-config libmobi ftxui ncurses
-    ```
+## Usage
 
-2.  **Configure and Compile:**
-    ```bash
-    mkdir build
-    cd build
-    cmake ..
-    make
-    ```
-    The executable `ebook_reader` will be created in the `build` directory.
+```bash
+./ebook_reader_static  # Linux
+./ebook_reader         # macOS
+```
+
+Navigate your library, select books, and enjoy reading in the terminal!
+
+## Dependencies
+
+The automated build handles all dependencies. For manual builds, you need:
+- CMake 3.16+
+- C++17 compiler
+- System libraries (automatically managed)
+
+## Troubleshooting
+
+- **Build Issues**: Use the automated build scripts (`./setup_build.sh`)
+- **Dependency Check**: Run `./check_linux_deps.sh` on Linux
+- **Support**: Check [Issues](https://github.com/your-repo/issues) for common problems
+
+## License
+
+This project follows standard open source practices. See source files for specific licensing information.
