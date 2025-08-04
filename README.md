@@ -24,6 +24,7 @@ To run the pre-compiled binary or to compile the project from source, you will n
 
 - **FTXUI:** `libftxui-dev` (Debian/Ubuntu), `ftxui-devel` (Fedora), `ftxui` (Arch AUR).
 - **libmobi:** `libmobi-dev` (Debian/Ubuntu), `libmobi-devel` (Fedora), `libmobi` (Arch).
+- **ncurses:** `libncurses-dev` (Debian/Ubuntu), `ncurses-devel` (Fedora), `ncurses` (Arch).
 
 ### Internal Dependencies (Handled Automatically)
 
@@ -61,18 +62,18 @@ The following libraries are also dependencies, but they are managed automaticall
     **For Debian/Ubuntu:**
     ```bash
     sudo apt update
-    sudo apt install build-essential cmake pkg-config libftxui-dev libmobi-dev
+    sudo apt install build-essential cmake pkg-config libftxui-dev libmobi-dev libncurses-dev
     ```
 
     **For Fedora/RHEL/CentOS:**
     ```bash
     sudo dnf groupinstall "Development Tools"
-    sudo dnf install cmake pkg-config ftxui-devel libmobi-devel
+    sudo dnf install cmake pkg-config ftxui-devel libmobi-devel ncurses-devel
     ```
 
     **For Arch Linux (using an AUR helper like `yay`):**
     ```bash
-    yay -S base-devel cmake pkg-config libmobi ftxui
+    yay -S base-devel cmake pkg-config libmobi ftxui ncurses
     ```
 
 2.  **Configure and Compile:**

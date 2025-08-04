@@ -31,6 +31,7 @@ else()
 
     # --- Dynamic Dependencies (pkg-config) ---
     find_package(PkgConfig REQUIRED)
+    find_package(Curses REQUIRED) # Find ncurses
     pkg_check_modules(FTXUI REQUIRED ftxui)
     link_directories(${FTXUI_LIBRARY_DIRS})
     pkg_check_modules(MOBI REQUIRED libmobi)
@@ -118,5 +119,5 @@ if(STATIC_BUILD)
     target_link_libraries(${EXECUTABLE_NAME} PRIVATE ftxui::screen ftxui::dom ftxui::component mobi)
 else()
     # Be explicit for dynamic builds as well, as ${FTXUI_LIBRARIES} can be inconsistent.
-    target_link_libraries(${EXECUTABLE_NAME} PRIVATE ftxui-screen ftxui-dom ftxui-component ${MOBI_LIBRARIES})
+    target_link_libraries(${EXECUTABLE_NAME} PRIVATE ftxui-screen ftxui-dom ftxui-component ${MOBI_LIBRARIES} ${CURSES_LIBRARIES})
 endif()
