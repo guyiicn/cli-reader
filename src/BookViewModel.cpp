@@ -1,6 +1,7 @@
 #include "BookViewModel.h"
 #include "HtmlRenderer.h"
 #include "DebugLogger.h"
+#include "PdfParser.h" // Include for dynamic_cast and PDF handling
 #include <numeric>
 
 using namespace ftxui;
@@ -143,62 +144,27 @@ void flatten_chapters_for_pagination(const std::vector<BookChapter>& chapters, s
 
 BookViewModel::BookViewModel(std::unique_ptr<IBookParser> parser) : parser_(std::move(parser)) {
     DebugLogger::log("BookViewModel created.");
-    // When a view model is created, immediately prepare the flat chapter list for pagination
-    flatten_chapters_for_pagination(parser_->GetChapters(), flat_chapters_);
+    
+    // Check if the book is a PDF
+    if (dynamic_cast<PdfParser*>(parser_.get())) {
+        is_pdf_ = true;
+        DebugLogger::log("BookViewModel: PDF mode enabled.");
+    } else {
+        // For non-PDFs, immediately prepare the flat chapter list for pagination
+        flatten_chapters_for_pagination(parser_->GetChapters(), flat_chapters_);
+    }
 }
 
 void BookViewModel::Paginate(int width, int height) {
-    /*
-    // --- OLD PAGINATION LOGIC (Preserved for reference) ---
-    all_lines_.clear();
-    pages_.clear();
-    page_to_chapter_index_.clear();
-    chapter_to_start_page_.assign(flat_chapters_.size(), 0);
-    DebugLogger::log("--- Starting Pagination ---");
-
-    if (width <= 0 || height <= 0) return;
-
-    std::vector<size_t> chapter_start_line_indices;
-    size_t line_count = 0;
-
-    // First, flatten all paragraphs into lines and record the start line of each chapter
-    for (const auto& chapter : flat_chapters_) {
-        chapter_start_line_indices.push_back(line_count);
-        for (const auto& p_text : chapter.paragraphs) {
-            auto wrapped_lines = word_wrap(p_text, width);
-            all_lines_.insert(all_lines_.end(), wrapped_lines.begin(), wrapped_lines.end());
-            line_count += wrapped_lines.size();
-        }
-        if (!chapter.paragraphs.empty()) {
-            all_lines_.push_back("");
-            line_count++;
-        }
+    if (is_pdf_) {
+        DebugLogger::log("--- Starting PDF Pagination Logic ---");
+        auto* pdf_parser = static_cast<PdfParser*>(parser_.get());
+        total_pages_ = pdf_parser->GetTotalPages();
+        DebugLogger::log("[Paginate] PDF pagination complete. Total pages: " + std::to_string(total_pages_));
+        return;
     }
 
-    // Now, create pages and map them to chapters
-    int current_chapter_idx = 0;
-    for (size_t i = 0; i < all_lines_.size(); i += height) {
-        while (current_chapter_idx + 1 < chapter_start_line_indices.size() &&
-               i >= chapter_start_line_indices[current_chapter_idx + 1]) {
-            current_chapter_idx++;
-        }
-        
-        if (chapter_to_start_page_[current_chapter_idx] == 0 && i != 0) {
-             chapter_to_start_page_[current_chapter_idx] = pages_.size();
-        }
-        if (current_chapter_idx == 0) {
-            chapter_to_start_page_[0] = 0;
-        }
-
-        Page page;
-        page.start_line_index = i;
-        page.end_line_index = std::min(i + height, all_lines_.size());
-        pages_.push_back(page);
-        page_to_chapter_index_.push_back(current_chapter_idx);
-    }
-    */
-
-    // --- NEW PAGINATION LOGIC ---
+    // --- Non-PDF Pagination Logic ---
     all_lines_.clear();
     pages_.clear();
     page_to_chapter_index_.clear();
@@ -256,8 +222,23 @@ void BookViewModel::Paginate(int width, int height) {
 }
 
 
-Elements BookViewModel::GetPageContent(int page_index) {
+Elements BookViewModel::GetPageContent(int page_index, int width) {
     Elements page_elements;
+
+    if (is_pdf_) {
+        if (page_index < 0 || page_index >= total_pages_) {
+            return page_elements;
+        }
+        auto* pdf_parser = static_cast<PdfParser*>(parser_.get());
+        std::string text_content = pdf_parser->GetTextForPage(page_index);
+        auto wrapped_lines = word_wrap(text_content, width);
+        for(const auto& line : wrapped_lines) {
+            page_elements.push_back(text(line));
+        }
+        return page_elements;
+    }
+
+    // Non-PDF logic
     if (page_index < 0 || page_index >= pages_.size()) {
         return page_elements;
     }
@@ -269,10 +250,17 @@ Elements BookViewModel::GetPageContent(int page_index) {
 }
 
 int BookViewModel::GetTotalPages() const {
+    if (is_pdf_) {
+        return total_pages_;
+    }
     return pages_.size();
 }
 
 std::string BookViewModel::GetPageTitleForPage(int page_index) {
+    if (is_pdf_) {
+        return "Page " + std::to_string(page_index + 1) + " / " + std::to_string(total_pages_);
+    }
+
     if (page_index < 0 || page_index >= page_to_chapter_index_.size()) {
         return "Unknown Chapter";
     }

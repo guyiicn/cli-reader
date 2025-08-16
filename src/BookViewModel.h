@@ -19,7 +19,7 @@ public:
     BookViewModel(std::unique_ptr<IBookParser> parser);
 
     void Paginate(int width, int height);
-    Elements GetPageContent(int page_index);
+    Elements GetPageContent(int page_index, int width);
     int GetTotalPages() const;
     std::string GetPageTitleForPage(int page_index);
     int GetChapterStartPage(int chapter_index) const;
@@ -33,6 +33,10 @@ private:
     std::vector<Page> pages_;
     std::vector<int> page_to_chapter_index_; // Maps a page index to its chapter index in the flat_chapters_ list
     std::vector<int> chapter_to_start_page_; // Maps a chapter index in the flat_chapters_ list to its start page
+
+    // PDF-specific handling
+    bool is_pdf_ = false;
+    int total_pages_ = 0;
 };
 
 #endif // BOOK_VIEW_MODEL_H

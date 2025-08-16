@@ -1,6 +1,5 @@
-
 cmake_minimum_required(VERSION 3.16)
-project(CliEbookReader CXX C)
+project(NewLastReader CXX C)
 
 set(CMAKE_OSX_ARCHITECTURES "arm64")
 set(CMAKE_CXX_STANDARD 17)
@@ -13,52 +12,29 @@ option(STATIC_BUILD "Build a self-contained, static executable" OFF)
 
 if(STATIC_BUILD)
     message(STATUS "--- Performing a STATIC build ---")
-    set(EXECUTABLE_NAME "ebook_reader_static")
+    set(EXECUTABLE_NAME "new_lastreader_static")
     set(BUILD_SHARED_LIBS OFF)
 
-    # --- Check for pre-built local dependencies ---
-    if(DEFINED FTXUI_ROOT AND EXISTS "${FTXUI_ROOT}")
-        message(STATUS "Using local FTXUI installation: ${FTXUI_ROOT}")
-        find_package(ftxui REQUIRED PATHS ${FTXUI_ROOT} NO_DEFAULT_PATH)
-        set(FTXUI_LOCAL_BUILD TRUE)
-    else()
-        message(STATUS "Using FetchContent for FTXUI")
-        FetchContent_Declare(ftxui_content GIT_REPOSITORY https://github.com/ArthurSonzogni/FTXUI.git GIT_TAG v5.0.0)
-        set(FTXUI_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-        set(FTXUI_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-        FetchContent_MakeAvailable(ftxui_content)
-        set(FTXUI_LOCAL_BUILD FALSE)
-    endif()
+    # --- Static Dependencies (FetchContent) ---
+    FetchContent_Declare(ftxui_content GIT_REPOSITORY https://github.com/ArthurSonzogni/FTXUI.git GIT_TAG v5.0.0)
+    set(FTXUI_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(FTXUI_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(ftxui_content)
 
-    if(DEFINED LIBMOBI_ROOT AND EXISTS "${LIBMOBI_ROOT}")
-        message(STATUS "Using local libmobi installation: ${LIBMOBI_ROOT}")
-        find_library(MOBI_LIBRARY mobi PATHS ${LIBMOBI_ROOT}/lib NO_DEFAULT_PATH REQUIRED)
-        find_path(MOBI_INCLUDE_DIR mobi.h PATHS ${LIBMOBI_ROOT}/include NO_DEFAULT_PATH REQUIRED)
-        
-        # Find libxml2 for libmobi XML functionality
-        find_package(PkgConfig REQUIRED)
-        pkg_check_modules(LIBXML2 REQUIRED libxml-2.0)
-        
-        set(LIBMOBI_LOCAL_BUILD TRUE)
-    else()
-        message(STATUS "Using FetchContent for libmobi")
-        FetchContent_Declare(libmobi_content GIT_REPOSITORY https://github.com/bfabiszewski/libmobi.git GIT_TAG v0.12)
-        set(BUILD_TOOLS OFF CACHE BOOL "" FORCE)
-        FetchContent_MakeAvailable(libmobi_content)
-        set(LIBMOBI_LOCAL_BUILD FALSE)
-    endif()
+    FetchContent_Declare(libmobi_content GIT_REPOSITORY https://github.com/bfabiszewski/libmobi.git GIT_TAG v0.12)
+    set(BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(libmobi_content)
 else()
     message(STATUS "--- Performing a DYNAMIC build ---")
-    set(EXECUTABLE_NAME "ebook_reader")
+    set(EXECUTABLE_NAME "new_lastreader")
 
     # --- Dynamic Dependencies (pkg-config) ---
     find_package(PkgConfig REQUIRED)
     find_package(Curses REQUIRED) # Find ncurses
     
     # Find FTXUI with fallback options
-    # Skip pkg-config for now due to static library linking issues
-    set(FTXUI_FOUND FALSE)
-    if(FALSE AND FTXUI_FOUND)
+    pkg_check_modules(FTXUI ftxui)
+    if(FTXUI_FOUND)
         message(STATUS "FTXUI found via pkg-config")
         message(STATUS "  FTXUI_LIBRARIES: ${FTXUI_LIBRARIES}")
         message(STATUS "  FTXUI_LIBRARY_DIRS: ${FTXUI_LIBRARY_DIRS}")
@@ -100,7 +76,26 @@ else()
     else()
         message(FATAL_ERROR "libmobi not found via pkg-config. Install libmobi-dev or similar package.")
     endif()
-endif()
+
+    # Find Poppler for PDF support
+    pkg_check_modules(POPPLER_CPP REQUIRED poppler-cpp)
+    if(POPPLER_CPP_FOUND)
+        message(STATUS "Poppler-cpp found via pkg-config")
+        link_directories(${POPPLER_CPP_LIBRARY_DIRS})
+    else()
+        message(FATAL_ERROR "poppler-cpp not found via pkg-config. Please install poppler.")
+    endif()
+
+    # Find CPR for networking
+    find_path(CPR_INCLUDE_DIR "cpr/cpr.h")
+    find_library(CPR_LIBRARY NAMES cpr)
+    if(CPR_INCLUDE_DIR AND CPR_LIBRARY)
+        message(STATUS "cpr found manually at ${CPR_INCLUDE_DIR} and ${CPR_LIBRARY}")
+    else()
+        message(FATAL_ERROR "cpr not found. Please install cpr.")
+    endif()
+
+    endif()
 
 # --- Common Dependencies (Always fetched) ---
 find_package(ZLIB REQUIRED)
@@ -159,31 +154,46 @@ endif()
 # --- Source Files ---
 add_executable(${EXECUTABLE_NAME}
     src/main.cpp
+    src/AppController.cpp
+    src/ConfigManager.cpp
+    src/AppState.cpp
+    src/EventHandlers.cpp
+    src/UIComponents.cpp
+    src/UIUtils.cpp
+    src/BookViewModel.cpp
+    src/DatabaseManager.cpp
+    src/DebugLogger.cpp
     src/EpubParser.cpp
     src/HtmlRenderer.cpp
-    src/BookViewModel.cpp
-    src/DebugLogger.cpp
-    src/TxtParser.cpp
     src/LibraryManager.cpp
-    src/DatabaseManager.cpp
     src/MobiParser.cpp
+    src/PdfParser.cpp
+    src/SystemUtils.cpp
+    src/TxtParser.cpp
+    src/uuid.cpp
+    src/sha256.cpp
+    src/GoogleAuthManager.cpp
+    src/GoogleDriveManager.cpp
+    src/SyncController.cpp
 )
 
 # --- Include Directories ---
 target_include_directories(${EXECUTABLE_NAME} PUBLIC 
-    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${gumbo_content_SOURCE_DIR}/src
 )
 if(NOT STATIC_BUILD)
     target_include_directories(${EXECUTABLE_NAME} PUBLIC 
         ${MOBI_INCLUDE_DIRS}
         ${FTXUI_INCLUDE_DIRS}
+        ${POPPLER_CPP_INCLUDE_DIRS}
+        ${CPR_INCLUDE_DIR}
     )
-else()
-    # Static build include directories for local builds
-    if(LIBMOBI_LOCAL_BUILD)
-        target_include_directories(${EXECUTABLE_NAME} PRIVATE ${MOBI_INCLUDE_DIR})
-    endif()
 endif()
+
+# Add definitions to handle non-standard C keywords (_Nullable, _Nonnull) from libzip headers
+target_compile_definitions(${EXECUTABLE_NAME} PRIVATE "_Nullable=" "_Nonnull=")
+
 
 # --- Linking Libraries ---
 target_link_libraries(${EXECUTABLE_NAME}
@@ -195,46 +205,19 @@ target_link_libraries(${EXECUTABLE_NAME}
   sqlite3_lib
 )
 if(STATIC_BUILD)
-    # Static build linking
-    if(FTXUI_LOCAL_BUILD)
-        # Use local pre-built FTXUI
-        target_link_libraries(${EXECUTABLE_NAME} PRIVATE ftxui::screen ftxui::dom ftxui::component)
-    else()
-        # Use FetchContent FTXUI
-        target_link_libraries(${EXECUTABLE_NAME} PRIVATE ftxui::screen ftxui::dom ftxui::component)
-    endif()
-    
-    if(LIBMOBI_LOCAL_BUILD)
-        # Use local pre-built libmobi with libxml2 dependency
-        target_link_libraries(${EXECUTABLE_NAME} PRIVATE ${MOBI_LIBRARY} ${LIBXML2_LIBRARIES})
-        target_link_directories(${EXECUTABLE_NAME} PRIVATE ${LIBXML2_LIBRARY_DIRS})
-        target_compile_options(${EXECUTABLE_NAME} PRIVATE ${LIBXML2_CFLAGS_OTHER})
-    else()
-        # Use FetchContent libmobi
-        target_link_libraries(${EXECUTABLE_NAME} PRIVATE mobi)
-    endif()
+    target_link_libraries(${EXECUTABLE_NAME} PRIVATE ftxui::screen ftxui::dom ftxui::component mobi)
 else()
-    # Dynamic build: Link libraries with correct order 
+    # Dynamic build: Link libraries with correct order
     # FTXUI链接顺序很重要：component -> dom -> screen
-    # Use the libraries found by manual detection or pkg-config
-    if(FTXUI_METHOD STREQUAL "manual")
-        target_link_libraries(${EXECUTABLE_NAME} PRIVATE 
-            ${FTXUI_COMPONENT_LIB}
-            ${FTXUI_DOM_LIB}
-            ${FTXUI_SCREEN_LIB}
-            ${MOBI_LIBRARIES} 
-            ${CURSES_LIBRARIES}
-        )
-    else()
-        # pkg-config method - use library names
-        target_link_libraries(${EXECUTABLE_NAME} PRIVATE 
-            ftxui-component 
-            ftxui-dom 
-            ftxui-screen 
-            ${MOBI_LIBRARIES} 
-            ${CURSES_LIBRARIES}
-        )
-    endif()
+    target_link_libraries(${EXECUTABLE_NAME} PRIVATE
+        ftxui-component
+        ftxui-dom
+        ftxui-screen
+        ${MOBI_LIBRARIES}
+        ${POPPLER_CPP_LIBRARIES}
+        ${CPR_LIBRARY}
+        ${CURSES_LIBRARIES}
+    )
     
     # Add compiler flags from pkg-config if available
     if(FTXUI_METHOD STREQUAL "pkg-config")
@@ -246,8 +229,17 @@ else()
     
     message(STATUS "Dynamic build configuration:")
     message(STATUS "  FTXUI method: ${FTXUI_METHOD}")
-    message(STATUS "  FTXUI component lib: ${FTXUI_COMPONENT_LIB}")
-    message(STATUS "  FTXUI dom lib: ${FTXUI_DOM_LIB}")
-    message(STATUS "  FTXUI screen lib: ${FTXUI_SCREEN_LIB}")
+    message(STATUS "  FTXUI libraries: ${FTXUI_LIBRARIES}")
     message(STATUS "  MOBI libraries: ${MOBI_LIBRARIES}")
+    message(STATUS "  Using explicit library names: ftxui-component ftxui-dom ftxui-screen")
 endif()
+
+# --- Install Configuration ---
+install(TARGETS ${EXECUTABLE_NAME} DESTINATION bin)
+
+# --- CPack Configuration ---
+set(CPACK_GENERATOR "TGZ")
+set(CPACK_PACKAGE_NAME "NewLastReader")
+set(CPACK_PACKAGE_VERSION "1.0.0")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "E-book reader with multiple format support")
+include(CPack)
