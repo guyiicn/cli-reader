@@ -212,19 +212,19 @@ Element UIComponents::RenderReaderView() {
         if (app_state_.current_page + 1 < app_state_.book_view_model->GetTotalPages()) {
             right_page = vbox(app_state_.book_view_model->GetPageContent(app_state_.current_page + 1, page_width)) | vscroll_indicator | frame | flex;
         } else {
-            right_page = text("") | flex; // Empty placeholder for the last page
+            right_page = text("") | frame | flex; // Empty placeholder for the last page
         }
         page_content = hbox({left_page, separator(), right_page});
     } else {
-        page_content = vbox(app_state_.book_view_model->GetPageContent(app_state_.current_page, page_width)) | vscroll_indicator | frame | flex;
+        page_content = vbox(app_state_.book_view_model->GetPageContent(app_state_.current_page, page_width)) | vscroll_indicator | frame;
     }
 
-    auto status_bar = hbox({text(progress_str), filler(), text("← Prev|→ Next|[d]Mode|[q]Back|[m]TOC")});
+    auto status_bar = hbox({text(progress_str), filler(), text("←/k Prev | →/j Next | [d]Mode | [q]Back | [m]TOC")});
     
     return vbox({
         text(full_title) | bold | hcenter,
         separator(),
-        page_content,
+        page_content | flex,
         separator(),
         status_bar
     }) | border;

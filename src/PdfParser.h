@@ -28,6 +28,7 @@ public:
     // New methods for lazy loading
     int GetTotalPages();
     std::string GetTextForPage(int page_num);
+    bool IsImageBased() const;
 
 private:
     void parseMetadata(); // Renamed for clarity
@@ -39,6 +40,7 @@ private:
     std::unique_ptr<poppler::document> doc_;
     int total_pages_ = -1; // Cache for total pages
     std::map<int, std::string> page_text_cache_;
+    bool is_image_based_ = false;
 };
 
 #endif // PDFPARSER_H

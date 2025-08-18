@@ -202,6 +202,12 @@ bool EventHandlers::HandleLibraryEvents(Event event, std::function<void()> refre
                             screen_.PostEvent(BOOK_LOAD_FAILURE);
                             return;
                         }
+                        if (pdf_parser->IsImageBased()) {
+                            app_state_.message_to_show = "This PDF appears to be image-based. OCR functionality is under development.";
+                            app_state_.current_view = View::ShowMessage;
+                            screen_.Post(Event::Custom);
+                            return;
+                        }
                     }
                     
                     std::unique_ptr<BookViewModel> temp_model = std::make_unique<BookViewModel>(std::move(parser));
@@ -391,7 +397,7 @@ bool EventHandlers::HandleReaderEvents(Event event, std::function<void()> refres
         return true;
     }
 
-    if (event == Event::ArrowRight) {
+    if (event == Event::ArrowRight || event == Event::Character('j')) {
         if (app_state_.book_view_model) {
             bool is_dual = app_state_.dual_page_mode_enabled && (screen_.dimx() > 100);
             int increment = is_dual ? 2 : 1;
@@ -405,7 +411,7 @@ bool EventHandlers::HandleReaderEvents(Event event, std::function<void()> refres
         return true;
     }
     
-    if (event == Event::ArrowLeft) {
+    if (event == Event::ArrowLeft || event == Event::Character('k')) {
         bool is_dual = app_state_.dual_page_mode_enabled && (screen_.dimx() > 100);
         int decrement = is_dual ? 2 : 1;
         app_state_.current_page -= decrement;

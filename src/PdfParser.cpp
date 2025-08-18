@@ -32,6 +32,25 @@ bool PdfParser::Load() {
         return false;
     }
     parseMetadata();
+
+    // Heuristic check for image-based PDF
+    int total_pages = doc_->pages();
+    if (total_pages > 0) {
+        const int pages_to_check = std::min(5, total_pages);
+        long total_chars = 0;
+        for (int i = 0; i < pages_to_check; ++i) {
+            std::unique_ptr<poppler::page> p(doc_->create_page(i));
+            if (p) {
+                total_chars += p->text().to_utf8().size();
+            }
+        }
+        // If the first few pages have very few characters, assume it's image-based.
+        if (total_chars < 50) { 
+            DebugLogger::log("PdfParser: PDF detected as image-based. Total chars in first " + std::to_string(pages_to_check) + " pages: " + std::to_string(total_chars));
+            is_image_based_ = true;
+        }
+    }
+
     return true;
 }
 
@@ -105,4 +124,8 @@ std::string PdfParser::GetTextForPage(int page_num) {
     std::string page_text = to_std_string(p->text());
     page_text_cache_[page_num] = page_text;
     return page_text;
+}
+
+bool PdfParser::IsImageBased() const {
+    return is_image_based_;
 }

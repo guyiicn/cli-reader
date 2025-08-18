@@ -231,6 +231,13 @@ Elements BookViewModel::GetPageContent(int page_index, int width) {
         }
         auto* pdf_parser = static_cast<PdfParser*>(parser_.get());
         std::string text_content = pdf_parser->GetTextForPage(page_index);
+        
+        // Handle case where a page is image-based and has no text
+        if (text_content.empty()) {
+            page_elements.push_back(text("--- This page contains no text ---") | dim | hcenter);
+            return page_elements;
+        }
+
         auto wrapped_lines = word_wrap(text_content, width);
         for(const auto& line : wrapped_lines) {
             page_elements.push_back(text(line));
