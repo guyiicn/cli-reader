@@ -155,7 +155,10 @@ When you run the program for the first time, it will automatically enter the ini
 使用 Homebrew 安装所有依赖：
 
 ```bash
-brew install cmake pkg-config ftxui libmobi poppler cpr zlib ncurses
+# 首先添加 FTXUI tap
+brew tap ArthurSonzogni/ftxui
+# 安装依赖
+brew install cmake pkg-config ftxui libmobi poppler cpr zlib ncurses libepub
 ```
 
 ### Linux
@@ -165,8 +168,10 @@ brew install cmake pkg-config ftxui libmobi poppler cpr zlib ncurses
 ```bash
 sudo apt update && sudo apt install -y \
     build-essential cmake pkg-config \
-    libftxui-dev libmobi-dev libpoppler-cpp-dev libcpr-dev \
+    libmobi-dev libpoppler-cpp-dev libepub-dev \
     zlib1g-dev libncurses-dev
+
+# 注意：FTXUI 和 CPR 需要从源码编译（见下方源码编译部分）
 ```
 
 #### Arch Linux
